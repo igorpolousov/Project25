@@ -29,9 +29,17 @@ class ViewController: UICollectionViewController, UINavigationControllerDelegate
     override func viewDidLoad() {
         super.viewDidLoad()
         // Добавление названия приложения, кнопки добавить сессию и кнопки выбрать картинку
-        title = "Selfie share"
-        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(showConnectionPrompt))
-        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .camera, target: self, action: #selector(importPicture))
+        
+        title = "Selfie Share"
+        let connectionButton = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(showConnectionPrompt))
+        // challenge 3
+        let connectedPeersButton = UIBarButtonItem(title: "Peers", style: .plain, target: self, action: #selector(showPeersPrompt))
+        navigationItem.leftBarButtonItems = [connectionButton, connectedPeersButton]
+        
+        let importPictureButton = UIBarButtonItem(barButtonSystemItem: .camera, target: self, action: #selector(importPicture))
+        // challenge 2
+        let sendMessageButton = UIBarButtonItem(barButtonSystemItem: .compose, target: self, action: #selector(showSendMessagePrompt))
+        navigationItem.rightBarButtonItems = [sendMessageButton, importPictureButton]
         
         // Создание сессии и передача управления сессией
         mcSession = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .required)
@@ -53,6 +61,64 @@ class ViewController: UICollectionViewController, UINavigationControllerDelegate
         }
         
         return cell
+    }
+    
+    @objc func showPeersPrompt() {
+        var peersText = ""
+
+        var peersAvailable = false
+        if let mcSession = mcSession {
+            if mcSession.connectedPeers.count > 0 {
+                peersAvailable = true
+                for peer in mcSession.connectedPeers {
+                    peersText += "\n\(peer.displayName)"
+                }
+            }
+        }
+        if !peersAvailable {
+            peersText += "\nNo peer connected"
+        }
+
+        let ac = UIAlertController(title: "Connected peers", message: peersText, preferredStyle: .actionSheet)
+        ac.popoverPresentationController?.barButtonItem = navigationItem.leftBarButtonItems?[1]
+        ac.addAction(UIAlertAction(title: "OK", style: .default))
+        present(ac, animated: true)
+    }
+    
+    @objc func showSendMessagePrompt() {
+        let ac = UIAlertController(title: "Message", message: nil, preferredStyle: .alert)
+        ac.addTextField()
+        ac.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        ac.addAction(UIAlertAction(title: "Send", style: .default, handler: { [weak self, weak ac] _ in
+            if let text = ac?.textFields?[0].text {
+                self?.sendMessage(text)
+            }
+        }))
+        present(ac, animated: true)
+    }
+    
+    func sendData(_ data: Data) {
+        // send data to peers
+        // is there an active session?
+        guard let mcSession = mcSession else { return }
+        // are there any peers to send to?
+        if mcSession.connectedPeers.count > 0 {
+            do {
+                // asynchronous method
+                try mcSession.send(data, toPeers: mcSession.connectedPeers, with: .reliable)
+            }
+            catch {
+                let ac = UIAlertController(title: "Send error", message: error.localizedDescription, preferredStyle: .alert)
+                ac.addAction(UIAlertAction(title: "OK", style: .default))
+                present(ac, animated: true)
+            }
+        }
+    }
+    
+    // challenge 2
+    func sendMessage(_ text: String) {
+        let data = Data(text.utf8)
+        sendData(data)
     }
     
     // Начало соединения
@@ -144,10 +210,18 @@ class ViewController: UICollectionViewController, UINavigationControllerDelegate
     }
     
     func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
+        // method is called on background thread
         DispatchQueue.main.async { [weak self] in
             if let image = UIImage(data: data) {
                 self?.images.insert(image, at: 0)
                 self?.collectionView.reloadData()
+            }
+            else {
+                // challenge 2
+                let text = String(decoding: data, as: UTF8.self)
+                let ac = UIAlertController(title: "Message received", message: "\n\(text)", preferredStyle: .alert)
+                ac.addAction(UIAlertAction(title: "OK", style: .default))
+                self?.present(ac, animated: true)
             }
         }
     }
