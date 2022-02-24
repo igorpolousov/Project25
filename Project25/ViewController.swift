@@ -1,9 +1,12 @@
 //
 //  ViewController.swift
 //  Project25
-//
+//  Days 83-84
 //  Created by Igor Polousov on 28.01.2022.
 //
+
+
+// В файл info.plist необходимо добавить Privacy - Local Network Usage Description, Bonjour services - item 0 - _hws-project25._tcp + item 1 - _hws-project25._udp
 
 import UIKit
 // Поддержка однорангового подключения peer to peer и обнаружение близлежащих устройств
